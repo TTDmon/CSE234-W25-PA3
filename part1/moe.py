@@ -90,6 +90,10 @@ class ShardedLinear:
         result = np.zeros((x.shape[0], self.out_features_global), dtype=np.float32)
 
         # TODO: Produce the result of sharded linear layer.
+        local_result = np.dot(x, self.weight) + self.bias
+        result[:, self.output_offset:self.output_offset + self.local_out_features] = local_result
+        mpi.barrier()
+        mpi.allgather(result)
 
         return result
 
@@ -165,6 +169,15 @@ class MoE_TP:
         # 1. Compute the routing indices and gates for each input
         indices, gates = self.router(x, self.topk)
         # 2. Process experts parallel with TP style. 
+
+        # Compute weighted combination of expert outputs
+        for k in range(self.topk):
+            for i in range(batch_size):
+                expert_idx = indices[i, k]
+                gate = gates[i, k]
+                item = x[i:i + 1]  # (1, input_dim)
+                expert_output = self.experts[expert_idx](item)
+                outputs[i] += gate * expert_output[0]
 
         return outputs
 
@@ -284,8 +297,19 @@ class MoE_EP:
         indices, gates = self.router(x, self.topk)
 
         # 2. Process local inputs with this expert (within the device)
+        # Compute weighted combination of expert outputs
+        for k in range(self.topk):
+            for i in range(batch_size):
+                expert_idx = indices[i, k]
+                if(expert_idx == self.rank):
+                    gate = gates[i, k]
+                    item = x[i:i + 1]
+                    expert_output = self.expert(item)
+                    outputs[i] += gate * expert_output[0]
 
         # 3. Communicate between devices to get the outputs from all experts
+        mpi.barrier()
+        mpi.allreduce(outputs)
 
         # 4. Return the outputs
 
