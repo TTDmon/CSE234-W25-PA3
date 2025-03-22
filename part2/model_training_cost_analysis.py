@@ -66,8 +66,9 @@ def model_training_cost_analysis_llama(model_config_path):
         lm_head_params
     )
 
+
 # In recitation yesterday TA mentioned we can use batch size of 1 and seq_len of maximum sequence length(2048) in the config file.
-# https://github.com/MrYxJ/calculate-flops.pytorch
+
 # https://catalog.ngc.nvidia.com/orgs/nvidia/teams/dgxc-benchmarking/resources/llama31-405b-dgxc-benchmarking-a#notes
 #     model flops = (sequence length) * ((attention flops) + (mlp flops) + (embedding flops))
 
@@ -84,7 +85,38 @@ def model_training_cost_analysis_llama(model_config_path):
 
 #     model flops = 8129 * (659,545,915,392 + 1,978,637,746,176 + 12,608,077,824) = 2.17E16
     
-    flops_layer_TF, peak_memory_GB = 0,0
+
+    # Model parameters
+    hidden_size = config["hidden_size"]
+    intermediate_size = config["intermediate_size"]
+    num_attention_heads = config["num_attention_heads"]
+    seq_len = config["max_sequence_length"]
+
+    head_dim = hidden_size // num_attention_heads
+
+    # Attention FLOPs
+    flops_qkv = 3 * (hidden_size * hidden_size) * seq_len
+    flops_attention_scores = 2 * (seq_len * seq_len) * hidden_size
+    flops_attention_proj = hidden_size * hidden_size * seq_len
+    total_attention_flops = flops_qkv + flops_attention_scores + flops_attention_proj
+
+    # Feed-forward FLOPs
+    flops_ffn_gate = hidden_size * intermediate_size * seq_len
+    flops_ffn_up = hidden_size * intermediate_size * seq_len
+    flops_ffn_down = intermediate_size * hidden_size * seq_len
+    total_ffn_flops = flops_ffn_gate + flops_ffn_up + flops_ffn_down
+
+    # Total FLOPs per layer
+    total_flops_per_layer = total_attention_flops + total_ffn_flops
+
+    # Convert FLOPs to TFLOPs (1 TFLOP = 1e12 FLOPs)
+    flops_layer_TF = total_flops_per_layer / 1e12
+
+    peak_memory_GB = 0
+
+
+
+    
 
     return total_params, flops_layer_TF, peak_memory_GB
 
