@@ -49,3 +49,6 @@ nosetests.xml
 coverage.xml
 htmlcov/
 pytest_cache/
+
+solution1.txt
+solution2.txt
