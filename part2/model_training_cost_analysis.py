@@ -98,9 +98,51 @@ def model_training_cost_analysis_llama(model_config_path):
     return total_params, flops_layer_TF, peak_memory_GB
 
 def model_training_cost_analysis_deepseek(model_config_path):
-    #TODO you code here.
+    with open(model_config_path, 'r') as f:
+        config = json.load(f)
+
+    # Extract necessary parameters from the config
+    hidden_size = config["hidden_size"]
+    intermediate_size = config["intermediate_size"]
+    num_hidden_layers = config["num_hidden_layers"]
+    vocab_size = config["vocab_size"]
+    num_attention_heads = config["num_attention_heads"]
+    moe_layer_freq = config["moe_layer_freq"]
+    n_routed_experts = config["n_routed_experts"]
+    moe_intermediate_size = config["moe_intermediate_size"]
+    num_experts_per_tok = config["num_experts_per_tok"]
+
+    # Calculate params per layer (non-MoE layers)
+    attn_params = 3 * hidden_size * hidden_size + hidden_size * hidden_size
+    mlp_params = 2 * hidden_size * intermediate_size
+    layer_norm_params = 2 * hidden_size
+
+    params_per_standard_layer = attn_params + mlp_params + layer_norm_params
+
+    # Calculate params for MoE layers
+    moe_params_per_expert = 2 * hidden_size * moe_intermediate_size
+    total_moe_params_per_layer = moe_params_per_expert * n_routed_experts
     
-    total_params, flops_layer_TF, peak_memory_GB = 0,0,0
+    num_moe_layers = num_hidden_layers // moe_layer_freq
+    num_standard_layers = num_hidden_layers - num_moe_layers
+
+    total_params = (
+        num_standard_layers * params_per_standard_layer +
+        num_moe_layers * (attn_params + total_moe_params_per_layer + layer_norm_params)
+    )
+
+    # Adding Embeddings parameters
+    embedding_params = vocab_size * hidden_size
+    total_params += embedding_params
+
+    # FLOPs estimation (Forward pass only)
+    flops_layer = 2 * total_params
+    flops_layer_TF = flops_layer / 1e12  # Convert to TeraFLOPs
+
+    # Peak Memory estimation (simplified)
+    peak_memory = total_params * 2  # bytes for bf16 (2 bytes per param)
+    peak_memory_GB = peak_memory / (1024**3)  # Convert bytes to GB
+
     return total_params, flops_layer_TF, peak_memory_GB
 
 def get_optimal_N_D_from_cost(cost_budget):
