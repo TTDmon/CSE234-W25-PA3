@@ -3,9 +3,10 @@ import json
 import math
 
 def model_training_cost_analysis_llama(model_config_path):
-# Model size
-# 6.74B params
-# 6738415616
+    # Model size
+    # 6.74B params
+    # 6738415616
+    
     # Model structure illustration:
     # Transformer-based Language Model
     #
@@ -73,6 +74,7 @@ def model_training_cost_analysis_llama(model_config_path):
     # 6bsh2 + 4bs2h + 3bs2n +2bsh2 + 6bshi
     # From Page50 of
     # https://hao-ai-lab.github.io/cse234-w25/assets/slides/feb27.pdf 
+    # 0.898050818048
     b = 1 # batch size
     s = config["max_sequence_length"] # seq_len
     h = config["hidden_size"] # hidden size
@@ -83,8 +85,16 @@ def model_training_cost_analysis_llama(model_config_path):
                       + 3 * b * s *  s * n 
                       + 2 * b * s * h * h 
                       + 6 * b * s * h * i)/1e12
+    
+    # 2 b s h / Giga
+    # Calculate peak memory cost (in GB) assuming fp16 precision
+    bytes_per_param = 2  # fp16 = 2 bytes
+    activation_memory_attention = b * s * h * bytes_per_param
 
-    peak_memory_GB = 0
+    # Peak memory includes model weights + activations
+    peak_memory_bytes = single_transformer_layer_params * bytes_per_param + activation_memory_attention 
+    peak_memory_GB = peak_memory_bytes / (1024**3)  # Convert bytes to GB
+
     return total_params, flops_layer_TF, peak_memory_GB
 
 def model_training_cost_analysis_deepseek(model_config_path):

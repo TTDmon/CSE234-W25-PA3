@@ -1,6 +1,6 @@
 Number of parameters: 6738415616
 Number of TFLOPs: 0.898050818048
-Peak memory cost: 0 GBs
+Peak memory cost: 0.3925933837890625 GBs
 Number of parameters: 0
 Number of TFLOPs: 0
 Peak memory cost: 0 GBs
