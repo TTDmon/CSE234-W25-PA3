@@ -1,0 +1,5 @@
+Number of parameters: 6738415616
+Number of TFLOPs: 0.898050818048 
+Peak memory cost: 0.648036352 GBs
+
+llama7B
