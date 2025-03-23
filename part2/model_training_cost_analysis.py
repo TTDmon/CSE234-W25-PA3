@@ -1,7 +1,7 @@
 import argparse
 import json
 import math
-
+from scipy.optimize import minimize_scalar
 def model_training_cost_analysis_llama(model_config_path):
     # Model size
     # 6.74B params
@@ -105,17 +105,41 @@ def model_training_cost_analysis_deepseek(model_config_path):
 
 def get_optimal_N_D_from_cost(cost_budget):
     """
-    cost_budget:  a monetary training budget (in dollars)
+    cost_budget: a monetary training budget (in dollars)
     Returns:
         N: Optimal total model parameters (in absolute numbers)
         D: Optimal number of training tokens (in absolute numbers)
         training_budget_flops: Effective total training FLOPs (in FLOPs)
         best_gpu: name of the selected GPU (one of 'A100', 'V100', 'T4')
     """
-    #TODO you code here
+    # GPU configuration
+    config_gpus = {
+        'A100': {'price': 4.0, 'TFLOPs': 312},
+        'V100': {'price': 2.5, 'TFLOPs': 125},
+        'T4': {'price': 1.0, 'TFLOPs': 65},
+    }
 
-    return N, D, training_budget_flops, best_gpu
+    TFLOPs_per_dollar = {gpu: cfg['TFLOPs'] / cfg['price'] for gpu, cfg in config_gpus.items()}
+    best_gpu = max(TFLOPs_per_dollar, key=TFLOPs_per_dollar.get)
 
+    training_budget_flops = (
+        cost_budget / config_gpus[best_gpu]['price'] * 3600
+        * config_gpus[best_gpu]['TFLOPs'] * 0.4 * 1e12
+    )
+
+    # Objective function for optimization
+    def objective(N):
+        D = training_budget_flops / (6 * N)
+        return (406.4 / (N ** 0.34)) + (410.7 / (D ** 0.29)) + 1.69
+
+    # Perform optimization using scalar minimization
+    result = minimize_scalar(objective, bounds=(1e5, 1e15))
+
+    # Calculate optimal N and D
+    N_optimal = int(result.x)
+    D_optimal = int(training_budget_flops / (6 * N_optimal))
+
+    return N_optimal, D_optimal, training_budget_flops, best_gpu
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Model training cost analysis')
@@ -127,6 +151,8 @@ if __name__ == "__main__":
         if 'deepseek' in args.model_config:
             num_parameters, num_flops, memory_cost = model_training_cost_analysis_deepseek(args.model_config)
         elif 'llama' in args.model_config:
+            num_parameters, num_flops, memory_cost = model_training_cost_analysis_llama(args.model_config)
+        elif 'my_model_config' in args.model_config:
             num_parameters, num_flops, memory_cost = model_training_cost_analysis_llama(args.model_config)
         else:
             print('Unknown LLM Type!')

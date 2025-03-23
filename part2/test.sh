@@ -1,2 +1,3 @@
 python3 model_training_cost_analysis.py --model_config llama_7b_config.json
 python3 model_training_cost_analysis.py --model_config deepseek_v3_config.json
+python3 model_training_cost_analysis.py --model_config my_model_config.json
